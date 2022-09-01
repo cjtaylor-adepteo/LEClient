@@ -1,5 +1,5 @@
 {
-    "name": "yourivw/leclient",
+    "name": "luminouw/leclient",
     "type": "library",
     "description": "PHP LetsEncrypt client library for ACME v2",
     "license": "MIT",
