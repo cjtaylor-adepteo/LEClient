@@ -59,8 +59,9 @@ class LEAccount
      * @param int 			$log 			The level of logging. Defaults to no logging. LOG_OFF, LOG_STATUS, LOG_DEBUG accepted.
      * @param array 		$email	 		The array of strings containing e-mail addresses. Only used when creating a new account.
      * @param array 		$accountKeys 	Array containing location of account keys files.
+     * @param array 		$eabParams		Array containing External Account Binding parameters if needed. Optionnal and only used when creating a new account.
      */
-	public function __construct($connector, $log, $email, $accountKeys)
+	public function __construct($connector, $log, $email, $accountKeys, $eabParams = array())
 	{
 		$this->connector = $connector;
 		$this->accountKeys = $accountKeys;
@@ -75,7 +76,17 @@ class LEAccount
 			else if($this->log >= LECLient::LOG_STATUS) LEFunctions::log('No account found, attempting to create account.', 'function LEAccount __construct');
 			
 			LEFunctions::RSAgenerateKeys(null, $this->accountKeys['private_key'], $this->accountKeys['public_key']);
-			$this->connector->accountURL = $this->createLEAccount($email);
+			
+			if (isset($eabParams['kid']) && isset($eabParams['hmac'])) {
+				if($this->log instanceof \Psr\Log\LoggerInterface) 
+				{
+					$this->log->info('Using External Account Binding for the new account.');
+				}
+				else if($this->log >= LECLient::LOG_STATUS) LEFunctions::log('Using External Account Binding for the new account.', 'function LEAccount __construct');
+				$this->connector->accountURL = $this->createLEAccount($email, $eabParams);
+			} else {
+				$this->connector->accountURL = $this->createLEAccount($email);
+			}
 		}
 		else
 		{
@@ -92,11 +103,18 @@ class LEAccount
      *
      * @return object	Returns the new account URL when the account was successfully created, false if not.
      */
-	private function createLEAccount($email)
+	private function createLEAccount($email, $eabParams = array())
 	{
 		$contact = array_map(function($addr) { return empty($addr) ? '' : (strpos($addr, 'mailto') === false ? 'mailto:' . $addr : $addr); }, $email);
 
-		$sign = $this->connector->signRequestJWK(array('contact' => $contact, 'termsOfServiceAgreed' => true), $this->connector->newAccount);
+        $payload = array('contact' => $contact, 'termsOfServiceAgreed' => true);
+
+        if (isset($eabParams['kid']) && isset($eabParams['hmac'])) {
+            $sign = $this->connector->signRequestJWK($payload, $this->connector->newAccount, '', $eabParams);
+        } else {
+            $sign = $this->connector->signRequestJWK($payload, $this->connector->newAccount);
+        }
+
 		$post = $this->connector->post($this->connector->newAccount, $sign);
 		if($post['status'] === 201)
 		{
@@ -132,11 +150,11 @@ class LEAccount
 		if($post['status'] === 200)
 		{
 			$this->id = isset($post['body']['id']) ? $post['body']['id'] : '';
-			$this->key = $post['body']['key'];
-			$this->contact = $post['body']['contact'];
+			$this->key = isset($post['body']['key']) ? $post['body']['key'] : '';
+			$this->contact = isset($post['body']['contact']) ? $post['body']['contact'] : '';
 			$this->agreement = isset($post['body']['agreement']) ? $post['body']['agreement'] : '';
-			$this->initialIp = $post['body']['initialIp'];
-			$this->createdAt = $post['body']['createdAt'];
+			$this->initialIp = isset($post['body']['initialIp']) ? $post['body']['initialIp'] : '';
+			$this->createdAt = isset($post['body']['createdAt']) ? $post['body']['createdAt'] : '';
 			$this->status = $post['body']['status'];
 		}
 		else

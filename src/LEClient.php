@@ -68,7 +68,7 @@ class LEClient
      * @param array 	$accountKeys 		Optional array containing location of account private and public keys. Required paths are private_key, public_key.
 	 * @param string    $sourceIp           Optional source IP address.
      */
-	public function __construct($email, $acmeURL = LEClient::LE_PRODUCTION, $log = LEClient::LOG_OFF, $certificateKeys = 'keys/', $accountKeys = '__account/', $sourceIp = false)
+	public function __construct($email, $acmeURL = LEClient::LE_PRODUCTION, $log = LEClient::LOG_OFF, $certificateKeys = 'keys/', $accountKeys = '__account/', $sourceIp = false, $eabParams = array())
 	{
 		$this->log = $log;
 		$this->sourceIp = $sourceIp;
@@ -156,7 +156,17 @@ class LEClient
 		}
 
 		$this->connector = new LEConnector($this->log, $this->baseURL, $this->accountKeys, $this->sourceIp);
-		$this->account = new LEAccount($this->connector, $this->log, $email, $this->accountKeys);
+		if ($this->connector->externalAccountRequired) {
+			if($this->log instanceof \Psr\Log\LoggerInterface) 
+			{
+				$this->log->info('LEClient : ACME provider requires External Account Binding');
+			}
+			elseif($this->log >= LEClient::LOG_STATUS) LEFunctions::log('LEClient : ACME provider requires External Account Binding', 'function LEClient __construct');
+
+			if (!isset($eabParams['kid'])) throw LEClientException::InvalidArgumentException('eabParams[kid] must be set for External Account Binding.');
+			if (!isset($eabParams['hmac'])) throw LEClientException::InvalidArgumentException('eabParams[hmac] must be set for External Account Binding.');
+		} 
+		$this->account = new LEAccount($this->connector, $this->log, $email, $this->accountKeys, $eabParams);
 		
 		if($this->log instanceof \Psr\Log\LoggerInterface) 
 		{

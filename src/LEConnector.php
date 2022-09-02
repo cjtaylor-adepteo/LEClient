@@ -49,6 +49,7 @@ class LEConnector
     public $newNonce;
 	public $newOrder;
 	public $revokeCert;
+	public $externalAccountRequired;
 
 	public $accountURL;
 	public $accountDeactivated = false;
@@ -81,11 +82,15 @@ class LEConnector
 	private function getLEDirectory()
 	{
 		$req = $this->get('/directory');
+        $this->externalAccountRequired = false;
 		$this->keyChange = $req['body']['keyChange'];
 		$this->newAccount = $req['body']['newAccount'];
 		$this->newNonce = $req['body']['newNonce'];
 		$this->newOrder = $req['body']['newOrder'];
 		$this->revokeCert = $req['body']['revokeCert'];
+        if (isset($req['body']['meta']['externalAccountRequired']) && (strtolower($req['body']['meta']['externalAccountRequired']) === "true" )) {
+            $this->externalAccountRequired = true;
+        }
 	}
 
     /**
@@ -223,7 +228,7 @@ class LEConnector
      *
      * @return string	Returns a JSON encoded string containing the signature.
      */
-	public function signRequestJWK($payload, $url, $privateKeyFile = '')
+	public function signRequestJWK($payload, $url, $privateKeyFile = '', $eabParams = array())
     {
 		if($privateKeyFile == '') $privateKeyFile = $this->accountKeys['private_key'];
 		$privateKey = openssl_pkey_get_private(file_get_contents($privateKeyFile));
@@ -240,8 +245,31 @@ class LEConnector
 			"url" => $url
         );
 
-        $payload64 = LEFunctions::Base64UrlSafeEncode(str_replace('\\/', '/', is_array($payload) ? json_encode($payload) : $payload));
-        $protected64 = LEFunctions::Base64UrlSafeEncode(json_encode($protected));
+        if (is_array($eabParams) && isset($eabParams['kid']) && isset($eabParams['hmac'])) {
+            $protectedEAB = array(
+                'alg' => 'HS256',
+                'kid' => $eabParams['kid'],
+                'url' => $url
+            );
+            $payloadEAB = $protected['jwk'];
+
+            $protectedEAB64 = LEFunctions::Base64UrlSafeEncode(is_array($protectedEAB) ? json_encode($protectedEAB, JSON_UNESCAPED_SLASHES) : $protectedEAB);
+            $payloadEAB64 = LEFunctions::Base64UrlSafeEncode(is_array($payloadEAB) ? json_encode($payloadEAB, JSON_UNESCAPED_SLASHES) : $payloadEAB);
+            
+            $signature = hash_hmac('sha256', $protectedEAB64 . '.' . $payloadEAB64, base64_decode(strtr($eabParams['hmac'], '-_', '+/')), true);
+
+            $eabArray = array('externalAccountBinding' => array(
+                'protected' => $protectedEAB64,
+				'payload'   => $payloadEAB64,
+				'signature' => rtrim(strtr(base64_encode($signature), '+/', '-_'), '=')
+			    )
+            );
+
+            $payload = $payload + $eabArray;
+        }
+
+        $payload64 = LEFunctions::Base64UrlSafeEncode(is_array($payload) ? json_encode($payload, JSON_UNESCAPED_SLASHES) : $payload);
+        $protected64 = LEFunctions::Base64UrlSafeEncode(is_array($protected) ? json_encode($protected, JSON_UNESCAPED_SLASHES) : $protected);
 
         openssl_sign($protected64.'.'.$payload64, $signed, $privateKey, "SHA256");
         $signed64 = LEFunctions::Base64UrlSafeEncode($signed);
@@ -251,7 +279,6 @@ class LEConnector
             'payload' => $payload64,
             'signature' => $signed64
         );
-
         return json_encode($data);
     }
 
@@ -278,8 +305,8 @@ class LEConnector
 			"url" => $url
         );
 
-        $payload64 = LEFunctions::Base64UrlSafeEncode(str_replace('\\/', '/', is_array($payload) ? json_encode($payload) : $payload));
-        $protected64 = LEFunctions::Base64UrlSafeEncode(json_encode($protected));
+        $payload64 = LEFunctions::Base64UrlSafeEncode(is_array($payload) ? json_encode($payload, JSON_UNESCAPED_SLASHES) : $payload);
+        $protected64 = LEFunctions::Base64UrlSafeEncode(json_encode($protected, JSON_UNESCAPED_SLASHES));
 
         openssl_sign($protected64.'.'.$payload64, $signed, $privateKey, "SHA256");
         $signed64 = LEFunctions::Base64UrlSafeEncode($signed);
