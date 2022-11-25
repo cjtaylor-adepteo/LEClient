@@ -46,6 +46,7 @@ class LEAuthorization
 	public $status;
 	public $expires;
 	public $challenges;
+	public $wildcard;
 
 	private $log;
 
@@ -70,6 +71,7 @@ class LEAuthorization
 			$this->status = $post['body']['status'];
 			$this->expires = $post['body']['expires'];
 			$this->challenges = $post['body']['challenges'];
+			$this->wildcard = $post['body']['wildcard'] === true ? true : false;
 		}
 		else
 		{
@@ -95,6 +97,7 @@ class LEAuthorization
 			$this->status = $post['body']['status'];
 			$this->expires = $post['body']['expires'];
 			$this->challenges = $post['body']['challenges'];
+			$this->wildcard = $post['body']['wildcard'] === true ? true : false;
 		}
 		else
 		{

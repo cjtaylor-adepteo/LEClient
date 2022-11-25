@@ -361,7 +361,7 @@ class LEOrder
 							break;
 						case LEOrder::CHALLENGE_TYPE_DNS:
 							$DNSDigest = LEFunctions::Base64UrlSafeEncode(hash('sha256', $keyAuthorization, true));
-							$authorizations[] = array('type' => LEOrder::CHALLENGE_TYPE_DNS, 'identifier' => $auth->identifier['value'], 'DNSDigest' => $DNSDigest);
+							$authorizations[] = array('type' => LEOrder::CHALLENGE_TYPE_DNS, 'identifier' => $auth->identifier['value'], 'DNSDigest' => $DNSDigest, 'wildcard' => $auth->wildcard);
 							break;
 					}
 				}
