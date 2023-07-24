@@ -37,33 +37,37 @@ namespace LEClient\Exceptions;
  */
 class LEOrderException extends LEException
 {
-	public const INVALIDKEYTYPEEXCEPTION 		= 0x31;
-	public const INVALIDORDERSTATUSEXCEPTION 	= 0x32;
-	public const CREATEFAILEDEXCEPTION 			= 0x33;
-	public const INVALIDARGUMENTEXCEPTION		= 0x34;
-	public const INVALIDCONFIGURATIONEXCEPTION	= 0x35;	
-	
-	public static function InvalidKeyTypeException(string $keyType)
+	final public const INVALIDKEYTYPEEXCEPTION 		= 0x31;
+
+	final public const INVALIDORDERSTATUSEXCEPTION 	= 0x32;
+
+	final public const CREATEFAILEDEXCEPTION 			= 0x33;
+
+	final public const INVALIDARGUMENTEXCEPTION		= 0x34;
+
+	final public const INVALIDCONFIGURATIONEXCEPTION	= 0x35;	
+
+	public static function InvalidKeyTypeException(string $keyType): static
 	{
-		return new static(sprintf('Key type \'%s\' not supported.', $keyType), self::INVALIDKEYTYPEEXCEPTION);
+		return new static(sprintf("Key type '%s' not supported.", $keyType), self::INVALIDKEYTYPEEXCEPTION);
 	}
-	
-	public static function InvalidOrderStatusException()
+
+	public static function InvalidOrderStatusException(): static
 	{
 		return new static('Order status is invalid.', self::INVALIDORDERSTATUSEXCEPTION);
 	}
-	
-	public static function CreateFailedException(string $message)
+
+	public static function CreateFailedException(string $message): static
 	{
 		return new static($message, self::CREATEFAILEDEXCEPTION);
 	}
-	
-	public static function InvalidArgumentException(string $message)
+
+	public static function InvalidArgumentException(string $message): static
 	{
 		return new static($message, self::INVALIDARGUMENTEXCEPTION);
 	}
-	
-	public static function InvalidConfigurationException(string $message)
+
+	public static function InvalidConfigurationException(string $message): static
 	{
 		return new static($message, self::INVALIDCONFIGURATIONEXCEPTION);
 	}

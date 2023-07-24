@@ -39,16 +39,15 @@ use LEClient\Exceptions\LEAuthorizationException;
  */
 class LEAuthorization
 {
-	private $connector;
-
-	public $authorizationURL;
 	public $identifier;
-	public $status;
-	public $expires;
-	public $challenges;
-	public $wildcard;
 
-	private $log;
+	public $status;
+
+	public $expires;
+
+	public $challenges;
+
+	public $wildcard;
 
     /**
      * Initiates the LetsEncrypt Authorization class. Child of a LetsEncrypt Order instance.
@@ -57,56 +56,38 @@ class LEAuthorization
      * @param int 			$log 				The level of logging. Defaults to no logging. LOG_OFF, LOG_STATUS, LOG_DEBUG accepted.
      * @param string 		$authorizationURL 	The URL of the authorization, given by a LetsEncrypt order request.
      */
-	public function __construct($connector, $log, $authorizationURL)
+	public function __construct(private $connector, private $log, public $authorizationURL)
 	{
-		$this->connector = $connector;
-		$this->log = $log;
-		$this->authorizationURL = $authorizationURL;
-
 		$sign = $this->connector->signRequestKid('', $this->connector->accountURL, $this->authorizationURL);
 		$post = $this->connector->post($this->authorizationURL, $sign);
-		if($post['status'] === 200)
-		{
-			$this->identifier = $post['body']['identifier'];
-			$this->status = $post['body']['status'];
-			$this->expires = $post['body']['expires'];
-			$this->challenges = $post['body']['challenges'];
-			$this->wildcard = isset($post['body']['wildcard']) && ($post['body']['wildcard'] === true) ? true : false;
-		}
-		else
-		{
-			if($this->log instanceof \Psr\Log\LoggerInterface) 
-			{
-				$this->log->info('Cannot find authorization \'' . $authorizationURL . '\'.');
-			}
-			elseif($this->log >= LEClient::LOG_STATUS) LEFunctions::log('Cannot find authorization \'' . $authorizationURL . '\'.', 'function LEAuthorization __construct');
-		}
+		if ($post['status'] === 200) {
+      $this->identifier = $post['body']['identifier'];
+      $this->status = $post['body']['status'];
+      $this->expires = $post['body']['expires'];
+      $this->challenges = $post['body']['challenges'];
+      $this->wildcard = isset($post['body']['wildcard']) && ($post['body']['wildcard'] === true);
+  } elseif ($this->log instanceof \Psr\Log\LoggerInterface) {
+      $this->log->info("Cannot find authorization '" . $authorizationURL . "'.");
+  } elseif($this->log >= LEClient::LOG_STATUS) LEFunctions::log("Cannot find authorization '" . $authorizationURL . "'.", 'function LEAuthorization __construct');
 	}
 
     /**
      * Updates the data associated with the current LetsEncrypt Authorization instance.
      */
 
-	public function updateData()
+	public function updateData(): void
 	{
 		$sign = $this->connector->signRequestKid('', $this->connector->accountURL, $this->authorizationURL);
 		$post = $this->connector->post($this->authorizationURL, $sign);
-		if($post['status'] === 200)
-		{
-			$this->identifier = $post['body']['identifier'];
-			$this->status = $post['body']['status'];
-			$this->expires = $post['body']['expires'];
-			$this->challenges = $post['body']['challenges'];
-			$this->wildcard = isset($post['body']['wildcard']) && ($post['body']['wildcard'] === true) ? true : false;
-		}
-		else
-		{
-			if($this->log instanceof \Psr\Log\LoggerInterface) 
-			{
-				$this->log->info('Cannot find authorization \'' . $this->authorizationURL . '\'.');
-			}
-			elseif($this->log >= LEClient::LOG_STATUS) LEFunctions::log('Cannot find authorization \'' . $this->authorizationURL . '\'.', 'function updateData');
-		}
+		if ($post['status'] === 200) {
+      $this->identifier = $post['body']['identifier'];
+      $this->status = $post['body']['status'];
+      $this->expires = $post['body']['expires'];
+      $this->challenges = $post['body']['challenges'];
+      $this->wildcard = isset($post['body']['wildcard']) && ($post['body']['wildcard'] === true);
+  } elseif ($this->log instanceof \Psr\Log\LoggerInterface) {
+      $this->log->info("Cannot find authorization '" . $this->authorizationURL . "'.");
+  } elseif($this->log >= LEClient::LOG_STATUS) LEFunctions::log("Cannot find authorization '" . $this->authorizationURL . "'.", 'function updateData');
 	}
 
     /**
@@ -123,6 +104,7 @@ class LEAuthorization
 		{
 			if($challenge['type'] == $type) return $challenge;
 		}
+
 		throw LEAuthorizationException::NoChallengeFoundException($type, $this->identifier['value']);
 	}
 }

@@ -52,16 +52,14 @@ class LEFunctions
 	{
 		if ($keySize < 2048 || $keySize > 4096) throw LEFunctionsException::InvalidArgumentException('RSA key size must be between 2048 and 4096.');
 
-		$res = openssl_pkey_new(array(
-			"private_key_type" => OPENSSL_KEYTYPE_RSA,
-			"private_key_bits" => intval($keySize),
-		));
+		$res = openssl_pkey_new(["private_key_type" => OPENSSL_KEYTYPE_RSA, "private_key_bits" => (int) $keySize]);
 
 		if ($res === false) {
 			$error = "Could not generate key pair! Check your OpenSSL configuration. OpenSSL Error: ".PHP_EOL;
 			while($message = openssl_error_string()){
 				$error .= $message.PHP_EOL;
 			}
+
 			throw LEFunctionsException::GenerateKeypairException($error);
 		}
 
@@ -70,6 +68,7 @@ class LEFunctions
 			while($message = openssl_error_string()){
 				$error .= $message.PHP_EOL;
 			}
+
 			throw LEFunctionsException::GenerateKeypairException($error);
 		}
 
@@ -101,17 +100,11 @@ class LEFunctions
 
 		if ($keySize == 256)
 		{
-			$res = openssl_pkey_new(array(
-					"private_key_type" => OPENSSL_KEYTYPE_EC,
-					"curve_name" => "prime256v1",
-			));
+			$res = openssl_pkey_new(["private_key_type" => OPENSSL_KEYTYPE_EC, "curve_name" => "prime256v1"]);
 		}
 		elseif ($keySize == 384)
 		{
-			$res = openssl_pkey_new(array(
-					"private_key_type" => OPENSSL_KEYTYPE_EC,
-					"curve_name" => "secp384r1",
-			));
+			$res = openssl_pkey_new(["private_key_type" => OPENSSL_KEYTYPE_EC, "curve_name" => "secp384r1"]);
 		}
 		else throw LEFunctionsException::InvalidArgumentException('EC key size must be 256 or 384.');
 
@@ -141,7 +134,7 @@ class LEFunctions
      *
      * @return string	Returns a URL safe base64 encoded string.
      */
-	public static function Base64UrlSafeEncode($input)
+	public static function Base64UrlSafeEncode($input): string
     {
         return str_replace('=', '', strtr(base64_encode($input), '+/', '-_'));
     }
@@ -153,13 +146,14 @@ class LEFunctions
      *
      * @return string	Returns the decoded input string.
      */
-    public static function Base64UrlSafeDecode($input)
+    public static function Base64UrlSafeDecode($input): string
     {
         $remainder = strlen($input) % 4;
-        if ($remainder) {
+        if ($remainder !== 0) {
             $padlen = 4 - $remainder;
             $input .= str_repeat('=', $padlen);
         }
+
         return base64_decode(strtr($input, '-_', '+/'));
     }
 
@@ -171,10 +165,10 @@ class LEFunctions
      * @param object	$data		The data to print.
      * @param string	$function	The function name to print above. Defaults to the calling function's name from the stacktrace. (optional)
      */
-	public static function log($data, $function = '')
+	public static function log($data, $function = ''): void
 	{
-		$e = new Exception();
-		$trace = $e->getTrace();
+		$exception = new Exception();
+		$trace = $exception->getTrace();
 		$function = $function == '' ? 'function ' .  $trace[3]['function'] . ' (function ' . $trace[2]['function'] . ')' : $function;
 		if (PHP_SAPI == "cli")
 		{
@@ -201,7 +195,7 @@ class LEFunctions
      *
      * @return boolean	Returns true if the challenge is valid, false if not.
      */
-	public static function checkHTTPChallenge($domain, $token, $keyAuthorization)
+	public static function checkHTTPChallenge($domain, $token, $keyAuthorization): bool
 	{
 		$requestURL = $domain . '/.well-known/acme-challenge/' . $token;
 		$handle = curl_init();
@@ -211,7 +205,7 @@ class LEFunctions
 		curl_setopt($handle, CURLOPT_SSL_VERIFYPEER, false);	
         $response = trim(curl_exec($handle));
 
-		return (!empty($response) && $response == $keyAuthorization);
+		return ($response !== '' && $response == $keyAuthorization);
 	}
 
     /**
@@ -222,24 +216,25 @@ class LEFunctions
      *
      * @return boolean	Returns true if the challenge is valid, false if not.
      */
-	public static function checkDNSChallenge($domain, $DNSDigest)
+	public static function checkDNSChallenge($domain, $DNSDigest): bool
 	{
 		$requestURL = 'https://dns.google.com/resolve?name=_acme-challenge.' . $domain . '&type=TXT';
 		$handle = curl_init();
         curl_setopt($handle, CURLOPT_URL, $requestURL);
         curl_setopt($handle, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($handle, CURLOPT_FOLLOWLOCATION, true);
-        $response = json_decode(trim(curl_exec($handle)));
+        $response = json_decode(trim(curl_exec($handle)), null, 512, JSON_THROW_ON_ERROR);
 		if($response->Status === 0 && isset($response->Answer))
 		{
 			foreach($response->Answer as $answer) 
 			{
-				if($answer->type === 16)
+				if($answer->type === 16 && $answer->data === $DNSDigest)
 				{
-					if($answer->data === $DNSDigest) return true;
+					return true;
 				}
 			}
 		}
+
 		return false;
 	}
 
@@ -248,7 +243,7 @@ class LEFunctions
      *
      * @param string	$directory	The directory in which to put the .htaccess file.
      */
-	public static function createhtaccess($directory)
+	public static function createhtaccess($directory): void
 	{
 		$htaccess = '<ifModule mod_authz_core.c>' . "\n"
 			. '    Require all denied' . "\n"

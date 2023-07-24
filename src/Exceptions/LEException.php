@@ -37,12 +37,9 @@ namespace LEClient\Exceptions;
  */
 class LEException extends \RuntimeException
 {
-	protected $responsedata;
-	
-	public function __construct(string $message = "", int $code = 0, Throwable $previous = NULL, array $responsedata = NULL)
+	public function __construct(string $message = "", int $code = 0, Throwable $throwable = NULL, protected ?array $responsedata = NULL)
 	{
-		parent::__construct($message, $code, $previous);
-		$this->responsedata = $responsedata;
+		parent::__construct($message, $code, $throwable);
 	}
 	
 	public function getResponseData()

@@ -37,10 +37,10 @@ namespace LEClient\Exceptions;
  */
 class LEAuthorizationException extends LEException
 {
-	public const NOCHALLENGEFOUNDEEXCEPTION	= 0x41;
+	final public const NOCHALLENGEFOUNDEEXCEPTION	= 0x41;
 	
-	public static function NoChallengeFoundException($type, $identifier)
+	public static function NoChallengeFoundException($type, $identifier): static
 	{
-		return new static(sprintf('No challenge found for type \'%s\' and identifier \'%s\'.', $type, $identifier), self::NOCHALLENGEFOUNDEEXCEPTION);
+		return new static(sprintf("No challenge found for type '%s' and identifier '%s'.", $type, $identifier), self::NOCHALLENGEFOUNDEEXCEPTION);
 	}
 }

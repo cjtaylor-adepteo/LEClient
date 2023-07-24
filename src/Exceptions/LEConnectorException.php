@@ -37,33 +37,37 @@ namespace LEClient\Exceptions;
  */
 class LEConnectorException extends LEException
 {
-	public const NONEWNONCEEXCEPTION 			= 0x11;
-	public const ACCOUNTDEACTIVATEDEXCEPTION 	= 0x12;
-	public const METHODNOTSUPPORTEDEXCEPTION 	= 0x13;
-	public const CURLERROREXCEPTION 			= 0x14;
-	public const INVALIDRESPONSEEXCEPTION 		= 0x15;
-	
-	public static function NoNewNonceException()
+	final public const NONEWNONCEEXCEPTION 			= 0x11;
+
+	final public const ACCOUNTDEACTIVATEDEXCEPTION 	= 0x12;
+
+	final public const METHODNOTSUPPORTEDEXCEPTION 	= 0x13;
+
+	final public const CURLERROREXCEPTION 			= 0x14;
+
+	final public const INVALIDRESPONSEEXCEPTION 		= 0x15;
+
+	public static function NoNewNonceException(): static
 	{
 		return new static('No new nonce.', self::NONEWNONCEEXCEPTION);
 	}
-	
-	public static function AccountDeactivatedException()
+
+	public static function AccountDeactivatedException(): static
 	{
 		return new static('The account was deactivated. No further requests can be made.', self::ACCOUNTDEACTIVATEDEXCEPTION);
 	}
-	
-	public static function MethodNotSupportedException(string $method)
+
+	public static function MethodNotSupportedException(string $method): static
 	{
 		return new static(sprintf('HTTP request %s not supported.', $method), self::METHODNOTSUPPORTEDEXCEPTION);
 	}
-	
-	public static function CurlErrorException(string $error)
+
+	public static function CurlErrorException(string $error): static
 	{
 		return new static(sprintf('Curl error: %s', $error), self::CURLERROREXCEPTION);
 	}
-	
-	public static function InvalidResponseException(array $response)
+
+	public static function InvalidResponseException(array $response): static
 	{
 		$statusCode = array_key_exists('status', $response) ? $response['status'] : 'unknown';
 		$detail = (array_key_exists('body', $response) && array_key_exists('detail', $response['body'])) ? $response['body']['detail'] : 'unknown';

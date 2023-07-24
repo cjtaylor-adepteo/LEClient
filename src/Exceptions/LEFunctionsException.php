@@ -37,21 +37,23 @@ namespace LEClient\Exceptions;
  */
 class LEFunctionsException extends LEException
 {
-	public const INVALIDARGUMENTEXCEPTION 	= 0x51;
-	public const GENERATEKEYPAIREXCEPTION 	= 0x52;
-	public const PHPVERSIONEXCEPTION 		= 0x53;
-	
-	public static function InvalidArgumentException(string $message)
+	final public const INVALIDARGUMENTEXCEPTION 	= 0x51;
+
+	final public const GENERATEKEYPAIREXCEPTION 	= 0x52;
+
+	final public const PHPVERSIONEXCEPTION 		= 0x53;
+
+	public static function InvalidArgumentException(string $message): static
 	{
 		return new static($message, self::INVALIDARGUMENTEXCEPTION);
 	}
-	
-	public static function GenerateKeypairException(string $message)
+
+	public static function GenerateKeypairException(string $message): static
 	{
 		return new static($message, self::GENERATEKEYPAIREXCEPTION);
 	}
-	
-	public static function PHPVersionException()
+
+	public static function PHPVersionException(): static
 	{
 		return new static('PHP 7.1+ required for EC keys.', self::PHPVERSIONEXCEPTION);
 	}

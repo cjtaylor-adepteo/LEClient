@@ -39,24 +39,23 @@ use LEClient\Exceptions\LEConnectorException;
  */
 class LEConnector
 {
-	public $baseURL;
-	public $accountKeys;
-
-	private $nonce;
+	private ?string $nonce = null;
 
 	public $keyChange;
+
 	public $newAccount;
+
     public $newNonce;
+
 	public $newOrder;
+
 	public $revokeCert;
+
 	public $externalAccountRequired;
 
 	public $accountURL;
-	public $accountDeactivated = false;
 
-	private $log;
-	
-	private $sourceIp = false;
+	public $accountDeactivated = false;
 
     /**
      * Initiates the LetsEncrypt Connector class.
@@ -66,20 +65,16 @@ class LEConnector
      * @param array		$accountKeys 	Array containing location of account keys files.
      * @param string    $sourceIp       Optional source IP address.
      */
-	public function __construct($log, $baseURL, $accountKeys, $sourceIp = false)
+	public function __construct(private $log, public $baseURL, public $accountKeys, private $sourceIp = false)
 	{
-		$this->baseURL = $baseURL;
-		$this->accountKeys = $accountKeys;
-		$this->log = $log;
 		$this->getLEDirectory();
 		$this->getNewNonce();
-		$this->sourceIp = $sourceIp;
 	}
 
     /**
      * Requests the LetsEncrypt Directory and stores the necessary URLs in this LetsEncrypt Connector instance.
      */
-	private function getLEDirectory()
+	private function getLEDirectory(): void
 	{
 		$req = $this->get('/directory');
         $this->externalAccountRequired = false;
@@ -88,7 +83,7 @@ class LEConnector
 		$this->newNonce = $req['body']['newNonce'];
 		$this->newOrder = $req['body']['newOrder'];
 		$this->revokeCert = $req['body']['revokeCert'];
-        if (isset($req['body']['meta']['externalAccountRequired']) && (strtolower($req['body']['meta']['externalAccountRequired']) === "true" )) {
+        if (isset($req['body']['meta']['externalAccountRequired']) && (strtolower((string) $req['body']['meta']['externalAccountRequired']) === "true" )) {
             $this->externalAccountRequired = true;
         }
 	}
@@ -114,7 +109,7 @@ class LEConnector
 	{
 		if($this->accountDeactivated) throw LEConnectorException::AccountDeactivatedException();
 
-		$headers = array('Accept: application/json', 'Content-Type: application/jose+json');
+		$headers = ['Accept: application/json', 'Content-Type: application/jose+json'];
 		$requestURL = preg_match('~^http~', $URL) ? $URL : $this->baseURL . $URL;
         $handle = curl_init();
         curl_setopt($handle, CURLOPT_URL, $requestURL);
@@ -124,7 +119,7 @@ class LEConnector
         if($this->sourceIp !== false) {
             curl_setopt($handle, CURLOPT_INTERFACE, $this->sourceIp);
         }
-        
+
         switch ($method) {
             case 'GET':
                 break;
@@ -140,9 +135,10 @@ class LEConnector
 				throw LEConnectorException::MethodNotSupportedException($method);
 				break;
         }
+
         $response = curl_exec($handle);
 
-        if(curl_errno($handle)) {
+        if(curl_errno($handle) !== 0) {
             throw LEConnectorException::CurlErrorException(curl_error($handle));
         }
 
@@ -151,19 +147,14 @@ class LEConnector
 
         $header = substr($response, 0, $headerSize);
         $body = substr($response, $headerSize);
-		$jsonbody = json_decode($body, true);
-		$jsonresponse = array(
-           		'request' => $method . ' ' . $requestURL,
-            		'header' => $header,
-            		'status' => $statusCode,
-            		'body' => $jsonbody === null ? $body : $jsonbody,
-        	);
+		$jsonbody = json_decode($body, true, 512, JSON_THROW_ON_ERROR);
+		$jsonresponse = ['request' => $method . ' ' . $requestURL, 'header' => $header, 'status' => $statusCode, 'body' => $jsonbody ?? $body];
 		if($this->log instanceof \Psr\Log\LoggerInterface) 
 		{
 			$this->log->debug($method . ' response received', $jsonresponse);
 		}
 		elseif($this->log >= LEClient::LOG_DEBUG) LEFunctions::log($jsonresponse);
-		
+
 		if(preg_match('~Replay\-Nonce: (\S+)~i', $header, $matches))
 		{
 			$this->nonce = trim($matches[1]);
@@ -173,8 +164,7 @@ class LEConnector
 			if($method == 'POST') $this->getNewNonce(); // Not expecting a new nonce with GET and HEAD requests.
 		}
 
-		if((($method == 'POST' OR $method == 'GET') AND $statusCode !== 200 AND $statusCode !== 201) OR
-			($method == 'HEAD' AND $statusCode !== 200))
+		if(($method == 'POST' || $method == 'GET') && $statusCode !== 200 && $statusCode !== 201 || $method == 'HEAD' && $statusCode !== 200)
 		{
 			throw LEConnectorException::InvalidResponseException($jsonresponse);
 		}
@@ -228,44 +218,27 @@ class LEConnector
      *
      * @return string	Returns a JSON encoded string containing the signature.
      */
-	public function signRequestJWK($payload, $url, $privateKeyFile = '', $eabParams = array())
+	public function signRequestJWK($payload, $url, $privateKeyFile = '', $eabParams = []): string
     {
 		if($privateKeyFile == '') $privateKeyFile = $this->accountKeys['private_key'];
+
 		$privateKey = openssl_pkey_get_private(file_get_contents($privateKeyFile));
         $details = openssl_pkey_get_details($privateKey);
 
-        $protected = array(
-            "alg" => "RS256",
-            "jwk" => array(
-                "kty" => "RSA",
-                "n" => LEFunctions::Base64UrlSafeEncode($details["rsa"]["n"]),
-                "e" => LEFunctions::Base64UrlSafeEncode($details["rsa"]["e"]),
-            ),
-			"nonce" => $this->nonce,
-			"url" => $url
-        );
+        $protected = ["alg" => "RS256", "jwk" => ["kty" => "RSA", "n" => LEFunctions::Base64UrlSafeEncode($details["rsa"]["n"]), "e" => LEFunctions::Base64UrlSafeEncode($details["rsa"]["e"])], "nonce" => $this->nonce, "url" => $url];
 
         if (is_array($eabParams) && isset($eabParams['kid']) && isset($eabParams['hmac'])) {
-            $protectedEAB = array(
-                'alg' => 'HS256',
-                'kid' => $eabParams['kid'],
-                'url' => $url
-            );
+            $protectedEAB = ['alg' => 'HS256', 'kid' => $eabParams['kid'], 'url' => $url];
             $payloadEAB = $protected['jwk'];
 
             $protectedEAB64 = LEFunctions::Base64UrlSafeEncode(is_array($protectedEAB) ? json_encode($protectedEAB, JSON_UNESCAPED_SLASHES) : $protectedEAB);
             $payloadEAB64 = LEFunctions::Base64UrlSafeEncode(is_array($payloadEAB) ? json_encode($payloadEAB, JSON_UNESCAPED_SLASHES) : $payloadEAB);
-            
+
             $signature = hash_hmac('sha256', $protectedEAB64 . '.' . $payloadEAB64, base64_decode(strtr($eabParams['hmac'], '-_', '+/')), true);
 
-            $eabArray = array('externalAccountBinding' => array(
-                'protected' => $protectedEAB64,
-				'payload'   => $payloadEAB64,
-				'signature' => rtrim(strtr(base64_encode($signature), '+/', '-_'), '=')
-			    )
-            );
+            $eabArray = ['externalAccountBinding' => ['protected' => $protectedEAB64, 'payload'   => $payloadEAB64, 'signature' => rtrim(strtr(base64_encode($signature), '+/', '-_'), '=')]];
 
-            $payload = $payload + $eabArray;
+            $payload += $eabArray;
         }
 
         $payload64 = LEFunctions::Base64UrlSafeEncode(is_array($payload) ? json_encode($payload, JSON_UNESCAPED_SLASHES) : $payload);
@@ -274,12 +247,8 @@ class LEConnector
         openssl_sign($protected64.'.'.$payload64, $signed, $privateKey, "SHA256");
         $signed64 = LEFunctions::Base64UrlSafeEncode($signed);
 
-        $data = array(
-            'protected' => $protected64,
-            'payload' => $payload64,
-            'signature' => $signed64
-        );
-        return json_encode($data);
+        $data = ['protected' => $protected64, 'payload' => $payload64, 'signature' => $signed64];
+        return json_encode($data, JSON_THROW_ON_ERROR);
     }
 
 	/**
@@ -292,18 +261,14 @@ class LEConnector
      *
      * @return string	Returns a JSON encoded string containing the signature.
      */
-	public function signRequestKid($payload, $kid, $url, $privateKeyFile = '')
+	public function signRequestKid($payload, $kid, $url, $privateKeyFile = ''): string
     {
 		if($privateKeyFile == '') $privateKeyFile = $this->accountKeys['private_key'];
+
         $privateKey = openssl_pkey_get_private(file_get_contents($privateKeyFile));
         $details = openssl_pkey_get_details($privateKey);
 
-        $protected = array(
-            "alg" => "RS256",
-            "kid" => $kid,
-			"nonce" => $this->nonce,
-			"url" => $url
-        );
+        $protected = ["alg" => "RS256", "kid" => $kid, "nonce" => $this->nonce, "url" => $url];
 
         $payload64 = LEFunctions::Base64UrlSafeEncode(is_array($payload) ? json_encode($payload, JSON_UNESCAPED_SLASHES) : $payload);
         $protected64 = LEFunctions::Base64UrlSafeEncode(json_encode($protected, JSON_UNESCAPED_SLASHES));
@@ -311,12 +276,8 @@ class LEConnector
         openssl_sign($protected64.'.'.$payload64, $signed, $privateKey, "SHA256");
         $signed64 = LEFunctions::Base64UrlSafeEncode($signed);
 
-        $data = array(
-            'protected' => $protected64,
-            'payload' => $payload64,
-            'signature' => $signed64
-        );
+        $data = ['protected' => $protected64, 'payload' => $payload64, 'signature' => $signed64];
 
-        return json_encode($data);
+        return json_encode($data, JSON_THROW_ON_ERROR);
     }
 }

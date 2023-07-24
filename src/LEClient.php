@@ -39,22 +39,24 @@ use LEClient\Exceptions\LEClientException;
  */
 class LEClient
 {
-	const LE_PRODUCTION = 'https://acme-v02.api.letsencrypt.org';
-	const LE_STAGING = 'https://acme-staging-v02.api.letsencrypt.org';
+    final public const LE_PRODUCTION = 'https://acme-v02.api.letsencrypt.org';
 
-	private $certificateKeys;
-	private $accountKeys;
+    final public const LE_STAGING = 'https://acme-staging-v02.api.letsencrypt.org';
 
-	private $connector;
-	private $account;
-	
-	private $sourceIp = false;
-	
-	private $log;
+    private $certificateKeys;
 
-	const LOG_OFF = 0;		// Logs no messages or faults, except Runtime Exceptions.
-	const LOG_STATUS = 1;	// Logs only messages and faults.
-	const LOG_DEBUG = 2;	// Logs messages, faults and raw responses from HTTP requests.
+    private $accountKeys;
+
+    private readonly \LEClient\LEConnector $leConnector;
+
+    private readonly \LEClient\LEAccount $leAccount;
+    private string $baseURL = LEClient::LE_PRODUCTION;
+
+    final public const LOG_OFF = 0;
+            // Logs no messages or faults, except Runtime Exceptions.
+    final public const LOG_STATUS = 1;
+        // Logs only messages and faults.
+    final public const LOG_DEBUG = 2;    // Logs messages, faults and raw responses from HTTP requests.
 
     /**
      * Initiates the LetsEncrypt main client.
@@ -66,125 +68,101 @@ class LEClient
      * @param array 	$certificateKeys 	Optional array containing location of all certificate files. Required paths are public_key, private_key, order and certificate/fullchain_certificate (you can use both or only one of them)
      * @param string 	$accountKeys 		The directory in which the account keys are stored. Is a subdir inside $certificateKeys. Defaults to '__account/'.(optional)
      * @param array 	$accountKeys 		Optional array containing location of account private and public keys. Required paths are private_key, public_key.
-	 * @param string    $sourceIp           Optional source IP address.
+     * @param string    $sourceIp           Optional source IP address.
      */
-	public function __construct($email, $acmeURL = LEClient::LE_PRODUCTION, $log = LEClient::LOG_OFF, $certificateKeys = 'keys/', $accountKeys = '__account/', $sourceIp = false, $eabParams = array())
-	{
-		$this->log = $log;
-		$this->sourceIp = $sourceIp;
-		if (is_bool($acmeURL))
-		{
-			if ($acmeURL === true) $this->baseURL = LEClient::LE_STAGING;
-			elseif ($acmeURL === false) $this->baseURL = LEClient::LE_PRODUCTION;
-		}
-		elseif (is_string($acmeURL))
-		{
-			$this->baseURL = $acmeURL;
-		}
-		else throw LEClientException::InvalidArgumentException('acmeURL must be set to string or bool (legacy).');
+    public function __construct($email, $acmeURL = LEClient::LE_PRODUCTION, private $log = LEClient::LOG_OFF, $certificateKeys = 'keys/', $accountKeys = '__account/', private $sourceIp = false, $eabParams = [])
+    {
+        $certificateKeysDir = null;
+        if (is_bool($acmeURL)) {
+            if ($acmeURL) $this->baseURL = LEClient::LE_STAGING;
+            elseif ($acmeURL === false) $this->baseURL = LEClient::LE_PRODUCTION;
+        } elseif (is_string($acmeURL)) {
+            $this->baseURL = $acmeURL;
+        } else throw LEClientException::InvalidArgumentException('acmeURL must be set to string or bool (legacy).');
 
-		if (is_array($certificateKeys) && is_string($accountKeys)) throw LEClientException::InvalidArgumentException('When certificateKeys is array, accountKeys must be array too.');
-		elseif (is_array($accountKeys) && is_string($certificateKeys)) throw LEClientException::InvalidArgumentException('When accountKeys is array, certificateKeys must be array too.');
+        if (is_array($certificateKeys) && is_string($accountKeys)) throw LEClientException::InvalidArgumentException('When certificateKeys is array, accountKeys must be array too.');
+        elseif (is_array($accountKeys) && is_string($certificateKeys)) throw LEClientException::InvalidArgumentException('When accountKeys is array, certificateKeys must be array too.');
 
-		if (is_string($certificateKeys))
-		{
-			$certificateKeysDir = $certificateKeys;
+        if (is_string($certificateKeys)) {
+            $certificateKeysDir = $certificateKeys;
 
-			if(!file_exists($certificateKeys))
-			{
-				mkdir($certificateKeys, 0755, true);
-				LEFunctions::createhtaccess($certificateKeys);
-			}
+            if (!file_exists($certificateKeys)) {
+                mkdir($certificateKeys, 0755, true);
+                LEFunctions::createhtaccess($certificateKeys);
+            }
 
-			$this->certificateKeys = array(
-				"public_key" => $certificateKeys.'/public.pem',
-				"private_key" => $certificateKeys.'/private.pem',
-				"certificate" => $certificateKeys.'/certificate.crt',
-				"fullchain_certificate" => $certificateKeys.'/fullchain.crt',
-				"order" => $certificateKeys.'/order'
-			);
-		}
-		elseif (is_array($certificateKeys))
-		{
-			if (!isset($certificateKeys['certificate']) && !isset($certificateKeys['fullchain_certificate'])) throw LEClientException::InvalidArgumentException('certificateKeys[certificate] or certificateKeys[fullchain_certificate] file path must be set.');
-			if (!isset($certificateKeys['private_key'])) throw LEClientException::InvalidArgumentException('certificateKeys[private_key] file path must be set.');
-			if (!isset($certificateKeys['order'])) $certificateKeys['order'] = dirname($certificateKeys['private_key']).'/order';
-			if (!isset($certificateKeys['public_key'])) $certificateKeys['public_key'] = dirname($certificateKeys['private_key']).'/public.pem';
+            $this->certificateKeys = ["public_key" => $certificateKeys . '/public.pem', "private_key" => $certificateKeys . '/private.pem', "certificate" => $certificateKeys . '/certificate.crt', "fullchain_certificate" => $certificateKeys . '/fullchain.crt', "order" => $certificateKeys . '/order'];
+        } elseif (is_array($certificateKeys)) {
+            if (!isset($certificateKeys['certificate']) && !isset($certificateKeys['fullchain_certificate'])) throw LEClientException::InvalidArgumentException('certificateKeys[certificate] or certificateKeys[fullchain_certificate] file path must be set.');
 
-			foreach ($certificateKeys as $param => $file) {
-				$parentDir = dirname($file);
-				if (!is_dir($parentDir)) throw LEClientException::InvalidDirectoryException($parentDir);
-			}
+            if (!isset($certificateKeys['private_key'])) throw LEClientException::InvalidArgumentException('certificateKeys[private_key] file path must be set.');
 
-			$this->certificateKeys = $certificateKeys;
-		}
-		else
-		{
-			throw LEClientException::InvalidArgumentException('certificateKeys must be string or array.');
-		}
+            if (!isset($certificateKeys['order'])) $certificateKeys['order'] = dirname((string) $certificateKeys['private_key']) . '/order';
 
-		if (is_string($accountKeys))
-		{
-			$accountKeys = $certificateKeysDir.'/'.$accountKeys;
+            if (!isset($certificateKeys['public_key'])) $certificateKeys['public_key'] = dirname((string) $certificateKeys['private_key']) . '/public.pem';
 
-			if(!file_exists($accountKeys))
-			{
-				mkdir($accountKeys, 0755, true);
-				LEFunctions::createhtaccess($accountKeys);
-			}
+            foreach ($certificateKeys as $param => $file) {
+                $parentDir = dirname((string) $file);
+                if (!is_dir($parentDir)) throw LEClientException::InvalidDirectoryException($parentDir);
+            }
 
-			$this->accountKeys = array(
-				"private_key" => $accountKeys.'/private.pem',
-				"public_key" => $accountKeys.'/public.pem'
-			);
-		}
-		elseif (is_array($accountKeys))
-		{
-			if (!isset($accountKeys['private_key'])) throw LEClientException::InvalidArgumentException('accountKeys[private_key] file path must be set.');
-			if (!isset($accountKeys['public_key'])) throw LEClientException::InvalidArgumentException('accountKeys[public_key] file path must be set.');
+            $this->certificateKeys = $certificateKeys;
+        } else {
+            throw LEClientException::InvalidArgumentException('certificateKeys must be string or array.');
+        }
 
-			foreach ($accountKeys as $param => $file) {
-				$parentDir = dirname($file);
-				if (!is_dir($parentDir)) throw LEClientException::InvalidDirectoryException($parentDir);
-			}
+        if (is_string($accountKeys)) {
+            $accountKeys = $certificateKeysDir . '/' . $accountKeys;
 
-			$this->accountKeys = $accountKeys;
-		}
-		else
-		{
-			throw LEClientException::InvalidArgumentException('accountKeys must be string or array.');
-		}
+            if (!file_exists($accountKeys)) {
+                mkdir($accountKeys, 0755, true);
+                LEFunctions::createhtaccess($accountKeys);
+            }
 
-		$this->connector = new LEConnector($this->log, $this->baseURL, $this->accountKeys, $this->sourceIp);
-		if ($this->connector->externalAccountRequired) {
-			if($this->log instanceof \Psr\Log\LoggerInterface) 
-			{
-				$this->log->info('LEClient : ACME provider requires External Account Binding');
-			}
-			elseif($this->log >= LEClient::LOG_STATUS) LEFunctions::log('LEClient : ACME provider requires External Account Binding', 'function LEClient __construct');
+            $this->accountKeys = ["private_key" => $accountKeys . '/private.pem', "public_key" => $accountKeys . '/public.pem'];
+        } elseif (is_array($accountKeys)) {
+            if (!isset($accountKeys['private_key'])) throw LEClientException::InvalidArgumentException('accountKeys[private_key] file path must be set.');
 
-			if (!isset($eabParams['kid'])) throw LEClientException::InvalidArgumentException('eabParams[kid] must be set for External Account Binding.');
-			if (!isset($eabParams['hmac'])) throw LEClientException::InvalidArgumentException('eabParams[hmac] must be set for External Account Binding.');
-		} 
-		$this->account = new LEAccount($this->connector, $this->log, $email, $this->accountKeys, $eabParams);
-		
-		if($this->log instanceof \Psr\Log\LoggerInterface) 
-		{
-			$this->log->info('LEClient finished constructing');
-		}
-		elseif($this->log >= LEClient::LOG_STATUS) LEFunctions::log('LEClient finished constructing', 'function LEClient __construct');
-	}
+            if (!isset($accountKeys['public_key'])) throw LEClientException::InvalidArgumentException('accountKeys[public_key] file path must be set.');
+
+            foreach ($accountKeys as $param => $file) {
+                $parentDir = dirname((string) $file);
+                if (!is_dir($parentDir)) throw LEClientException::InvalidDirectoryException($parentDir);
+            }
+
+            $this->accountKeys = $accountKeys;
+        } else {
+            throw LEClientException::InvalidArgumentException('accountKeys must be string or array.');
+        }
+
+        $this->leConnector = new LEConnector($this->log, $this->baseURL, $this->accountKeys, $this->sourceIp);
+        if ($this->leConnector->externalAccountRequired) {
+            if ($this->log instanceof \Psr\Log\LoggerInterface) {
+                $this->log->info('LEClient : ACME provider requires External Account Binding');
+            } elseif ($this->log >= LEClient::LOG_STATUS) LEFunctions::log('LEClient : ACME provider requires External Account Binding', 'function LEClient __construct');
+
+            if (!isset($eabParams['kid'])) throw LEClientException::InvalidArgumentException('eabParams[kid] must be set for External Account Binding.');
+
+            if (!isset($eabParams['hmac'])) throw LEClientException::InvalidArgumentException('eabParams[hmac] must be set for External Account Binding.');
+        }
+
+        $this->leAccount = new LEAccount($this->leConnector, $this->log, $email, $this->accountKeys, $eabParams);
+
+        if ($this->log instanceof \Psr\Log\LoggerInterface) {
+            $this->log->info('LEClient finished constructing');
+        } elseif ($this->log >= LEClient::LOG_STATUS) LEFunctions::log('LEClient finished constructing', 'function LEClient __construct');
+    }
 
 
     /**
      * Returns the LetsEncrypt account used in the current client.
-	 *
-	 * @return LEAccount	The LetsEncrypt Account instance used by the client.
+     *
+     * @return LEAccount	The LetsEncrypt Account instance used by the client.
      */
-	public function getAccount()
-	{
-		return $this->account;
-	}
+    public function getAccount()
+    {
+        return $this->leAccount;
+    }
 
     /**
      * Returns a LetsEncrypt order. If an order exists, this one is returned. If not, a new order is created and returned.
@@ -197,8 +175,8 @@ class LEClient
      *
      * @return LEOrder	The LetsEncrypt Order instance which is either retrieved or created.
      */
-	public function getOrCreateOrder($basename, $domains, $keyType = 'rsa-4096', $notBefore = '', $notAfter = '')
-	{
-		return new LEOrder($this->connector, $this->log, $this->certificateKeys, $basename, $domains, $keyType, $notBefore, $notAfter);
-	}
+    public function getOrCreateOrder($basename, $domains, $keyType = 'rsa-4096', $notBefore = '', $notAfter = ''): \LEClient\LEOrder
+    {
+        return new LEOrder($this->leConnector, $this->log, $this->certificateKeys, $basename, $domains, $notBefore, $notAfter, $keyType);
+    }
 }

@@ -37,9 +37,9 @@ namespace LEClient\Exceptions;
  */
 class LEAccountException extends LEException
 {
-	public const ACCOUNTNOTFOUNDEEXCEPTION 	= 0x21;
+	final public const ACCOUNTNOTFOUNDEEXCEPTION 	= 0x21;
 	
-	public static function AccountNotFoundException()
+	public static function AccountNotFoundException(): static
 	{
 		return new static('Account not found or deactivated.', self::ACCOUNTNOTFOUNDEEXCEPTION);
 	}

@@ -37,15 +37,16 @@ namespace LEClient\Exceptions;
  */
 class LEClientException extends LEException
 {
-	public const INVALIDARGUMENTEXCEPTION 	= 0x01;
-	public const INVALIDDIRECTORYEXCEPTION 	= 0x02;
-	
-	public static function InvalidArgumentException(string $message)
+	final public const INVALIDARGUMENTEXCEPTION 	= 0x01;
+
+	final public const INVALIDDIRECTORYEXCEPTION 	= 0x02;
+
+	public static function InvalidArgumentException(string $message): static
 	{
 		return new static($message, self::INVALIDARGUMENTEXCEPTION);
 	}
-	
-	public static function InvalidDirectoryException(string $directory)
+
+	public static function InvalidDirectoryException(string $directory): static
 	{
 		return new static(sprintf('%s directory not found.', $directory), self::INVALIDDIRECTORYEXCEPTION);
 	}
