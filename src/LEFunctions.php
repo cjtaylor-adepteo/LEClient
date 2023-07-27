@@ -48,43 +48,42 @@ class LEFunctions
      * @param string	$publicKeyFile  The filename for the public key file.
      * @param string	$keySize 		RSA key size, must be between 2048 and 4096 (default is 4096)
      */
-	public static function RSAGenerateKeys($directory, $privateKeyFile = 'private.pem', $publicKeyFile = 'public.pem', $keySize = 4096)
-	{
-		if ($keySize < 2048 || $keySize > 4096) throw LEFunctionsException::InvalidArgumentException('RSA key size must be between 2048 and 4096.');
+    public static function RSAGenerateKeys($directory, $privateKeyFile = 'private.pem', $publicKeyFile = 'public.pem', $keySize = 4096)
+    {
+        if ($keySize < 2048 || $keySize > 4096) throw LEFunctionsException::InvalidArgumentException('RSA key size must be between 2048 and 4096.');
 
-		$res = openssl_pkey_new(["private_key_type" => OPENSSL_KEYTYPE_RSA, "private_key_bits" => (int) $keySize]);
+        $res = openssl_pkey_new(["private_key_type" => OPENSSL_KEYTYPE_RSA, "private_key_bits" => (int) $keySize]);
 
-		if ($res === false) {
-			$error = "Could not generate key pair! Check your OpenSSL configuration. OpenSSL Error: ".PHP_EOL;
-			while($message = openssl_error_string()){
-				$error .= $message.PHP_EOL;
-			}
+        if ($res === false) {
+            $error = "Could not generate key pair! Check your OpenSSL configuration. OpenSSL Error: " . PHP_EOL;
+            while ($message = openssl_error_string()) {
+                $error .= $message . PHP_EOL;
+            }
 
-			throw LEFunctionsException::GenerateKeypairException($error);
-		}
+            throw LEFunctionsException::GenerateKeypairException($error);
+        }
 
-		if(!openssl_pkey_export($res, $privateKey)) {
-			$error = "RSA keypair export failed!! Error: ".PHP_EOL;
-			while($message = openssl_error_string()){
-				$error .= $message.PHP_EOL;
-			}
+        if (!openssl_pkey_export($res, $privateKey)) {
+            $error = "RSA keypair export failed!! Error: " . PHP_EOL;
+            while ($message = openssl_error_string()) {
+                $error .= $message . PHP_EOL;
+            }
 
-			throw LEFunctionsException::GenerateKeypairException($error);
-		}
+            throw LEFunctionsException::GenerateKeypairException($error);
+        }
 
-		$details = openssl_pkey_get_details($res);
+        $details = openssl_pkey_get_details($res);
 
-		if ($directory !== null && $directory !== '')
-		{
-			$privateKeyFile = $directory.$privateKeyFile;
-			$publicKeyFile = $directory.$publicKeyFile;
-		}
+        if ($directory !== null && $directory !== '') {
+            $privateKeyFile = $directory . $privateKeyFile;
+            $publicKeyFile = $directory . $publicKeyFile;
+        }
 
-		file_put_contents($privateKeyFile, $privateKey);
-		file_put_contents($publicKeyFile, $details['key']);
+        file_put_contents($privateKeyFile, $privateKey);
+        file_put_contents($publicKeyFile, $details['key']);
 
-		openssl_pkey_free($res);
-	}
+        //openssl_pkey_free($res);
+    }
 
     /**
      * Generates a new EC prime256v1 keypair and saves both keys to a new file.
@@ -94,36 +93,31 @@ class LEFunctions
      * @param string	$publicKeyFile  The filename for the public key file.
      * @param string	$keysize  		EC key size, possible values are 256 (prime256v1) or 384 (secp384r1), default is 256
      */
-	public static function ECGenerateKeys($directory, $privateKeyFile = 'private.pem', $publicKeyFile = 'public.pem', $keySize = 256)
-	{
-		if (version_compare(PHP_VERSION, '7.1.0') == -1) throw LEFunctionsException::PHPVersionException();
+    public static function ECGenerateKeys($directory, $privateKeyFile = 'private.pem', $publicKeyFile = 'public.pem', $keySize = 256)
+    {
+        if (version_compare(PHP_VERSION, '7.1.0') == -1) throw LEFunctionsException::PHPVersionException();
 
-		if ($keySize == 256)
-		{
-			$res = openssl_pkey_new(["private_key_type" => OPENSSL_KEYTYPE_EC, "curve_name" => "prime256v1"]);
-		}
-		elseif ($keySize == 384)
-		{
-			$res = openssl_pkey_new(["private_key_type" => OPENSSL_KEYTYPE_EC, "curve_name" => "secp384r1"]);
-		}
-		else throw LEFunctionsException::InvalidArgumentException('EC key size must be 256 or 384.');
+        if ($keySize == 256) {
+            $res = openssl_pkey_new(["private_key_type" => OPENSSL_KEYTYPE_EC, "curve_name" => "prime256v1"]);
+        } elseif ($keySize == 384) {
+            $res = openssl_pkey_new(["private_key_type" => OPENSSL_KEYTYPE_EC, "curve_name" => "secp384r1"]);
+        } else throw LEFunctionsException::InvalidArgumentException('EC key size must be 256 or 384.');
 
 
-		if(!openssl_pkey_export($res, $privateKey)) throw LEFunctionsException::GenerateKeypairException('EC keypair export failed!');
+        if (!openssl_pkey_export($res, $privateKey)) throw LEFunctionsException::GenerateKeypairException('EC keypair export failed!');
 
-		$details = openssl_pkey_get_details($res);
+        $details = openssl_pkey_get_details($res);
 
-		if ($directory !== null && $directory !== '')
-		{
-			$privateKeyFile = $directory.$privateKeyFile;
-			$publicKeyFile = $directory.$publicKeyFile;
-		}
+        if ($directory !== null && $directory !== '') {
+            $privateKeyFile = $directory . $privateKeyFile;
+            $publicKeyFile = $directory . $publicKeyFile;
+        }
 
-		file_put_contents($privateKeyFile, $privateKey);
-		file_put_contents($publicKeyFile, $details['key']);
+        file_put_contents($privateKeyFile, $privateKey);
+        file_put_contents($publicKeyFile, $details['key']);
 
-		openssl_pkey_free($res);
-	}
+        //openssl_pkey_free($res);
+    }
 
 
 
@@ -134,7 +128,7 @@ class LEFunctions
      *
      * @return string	Returns a URL safe base64 encoded string.
      */
-	public static function Base64UrlSafeEncode($input): string
+    public static function Base64UrlSafeEncode($input): string
     {
         return str_replace('=', '', strtr(base64_encode($input), '+/', '-_'));
     }
@@ -165,24 +159,21 @@ class LEFunctions
      * @param object	$data		The data to print.
      * @param string	$function	The function name to print above. Defaults to the calling function's name from the stacktrace. (optional)
      */
-	public static function log($data, $function = ''): void
-	{
-		$exception = new Exception();
-		$trace = $exception->getTrace();
-		$function = $function == '' ? 'function ' .  $trace[3]['function'] . ' (function ' . $trace[2]['function'] . ')' : $function;
-		if (PHP_SAPI == "cli")
-		{
-			echo '[' . date('d-m-Y H:i:s') . '] ' . $function . ":\n";
-			print_r($data);
-			echo "\n\n";
-		}
-		else
-		{
-			echo '<b>' . date('d-m-Y H:i:s') . ', ' . $function . ':</b><br>';
-			print_r($data);
-			echo '<br><br>';
-		}
-	}
+    public static function log($data, $function = ''): void
+    {
+        $exception = new Exception();
+        $trace = $exception->getTrace();
+        $function = $function == '' ? 'function ' .  $trace[3]['function'] . ' (function ' . $trace[2]['function'] . ')' : $function;
+        if (PHP_SAPI == "cli") {
+            echo '[' . date('d-m-Y H:i:s') . '] ' . $function . ":\n";
+            print_r($data);
+            echo "\n\n";
+        } else {
+            echo '<b>' . date('d-m-Y H:i:s') . ', ' . $function . ':</b><br>';
+            print_r($data);
+            echo '<br><br>';
+        }
+    }
 
 
 
@@ -195,18 +186,18 @@ class LEFunctions
      *
      * @return boolean	Returns true if the challenge is valid, false if not.
      */
-	public static function checkHTTPChallenge($domain, $token, $keyAuthorization): bool
-	{
-		$requestURL = $domain . '/.well-known/acme-challenge/' . $token;
-		$handle = curl_init();
+    public static function checkHTTPChallenge($domain, $token, $keyAuthorization): bool
+    {
+        $requestURL = $domain . '/.well-known/acme-challenge/' . $token;
+        $handle = curl_init();
         curl_setopt($handle, CURLOPT_URL, $requestURL);
         curl_setopt($handle, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($handle, CURLOPT_FOLLOWLOCATION, true);
-		curl_setopt($handle, CURLOPT_SSL_VERIFYPEER, false);	
+        curl_setopt($handle, CURLOPT_SSL_VERIFYPEER, false);
         $response = trim(curl_exec($handle));
 
-		return ($response !== '' && $response == $keyAuthorization);
-	}
+        return ($response !== '' && $response == $keyAuthorization);
+    }
 
     /**
      * Checks whether the applicable DNS TXT record is a valid authorization for the given $domain.
@@ -216,41 +207,38 @@ class LEFunctions
      *
      * @return boolean	Returns true if the challenge is valid, false if not.
      */
-	public static function checkDNSChallenge($domain, $DNSDigest): bool
-	{
-		$requestURL = 'https://dns.google.com/resolve?name=_acme-challenge.' . $domain . '&type=TXT';
-		$handle = curl_init();
+    public static function checkDNSChallenge($domain, $DNSDigest): bool
+    {
+        $requestURL = 'https://dns.google.com/resolve?name=_acme-challenge.' . $domain . '&type=TXT';
+        $handle = curl_init();
         curl_setopt($handle, CURLOPT_URL, $requestURL);
         curl_setopt($handle, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($handle, CURLOPT_FOLLOWLOCATION, true);
         $response = json_decode(trim(curl_exec($handle)), null, 512, JSON_THROW_ON_ERROR);
-		if($response->Status === 0 && isset($response->Answer))
-		{
-			foreach($response->Answer as $answer) 
-			{
-				if($answer->type === 16 && $answer->data === $DNSDigest)
-				{
-					return true;
-				}
-			}
-		}
+        if ($response->Status === 0 && isset($response->Answer)) {
+            foreach ($response->Answer as $answer) {
+                if ($answer->type === 16 && $answer->data === $DNSDigest) {
+                    return true;
+                }
+            }
+        }
 
-		return false;
-	}
+        return false;
+    }
 
     /**
      * Creates a simple .htaccess file in $directory which denies from all.
      *
      * @param string	$directory	The directory in which to put the .htaccess file.
      */
-	public static function createhtaccess($directory): void
-	{
-		$htaccess = '<ifModule mod_authz_core.c>' . "\n"
-			. '    Require all denied' . "\n"
-			. '</ifModule>' . "\n"
-			. '<ifModule !mod_authz_core.c>' . "\n"
-			. '    Deny from all' . "\n"
-			. '</ifModule>' . "\n";
-		file_put_contents($directory . '.htaccess', $htaccess);
-	}
+    public static function createhtaccess($directory): void
+    {
+        $htaccess = '<ifModule mod_authz_core.c>' . "\n"
+            . '    Require all denied' . "\n"
+            . '</ifModule>' . "\n"
+            . '<ifModule !mod_authz_core.c>' . "\n"
+            . '    Deny from all' . "\n"
+            . '</ifModule>' . "\n";
+        file_put_contents($directory . '.htaccess', $htaccess);
+    }
 }
